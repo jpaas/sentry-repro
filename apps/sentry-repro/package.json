@@ -7,7 +7,6 @@
     "metro-config": "*",
     "react": "*",
     "react-native": "*",
-    "react-native-config": "*",
     "react-native-svg": "*"
   },
   "name": "sentry-repro",

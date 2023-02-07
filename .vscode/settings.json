@@ -33,21 +33,13 @@
   "js/ts.implicitProjectConfig.experimentalDecorators": true,
   "relay.autoStartCompiler": true,
   "ruby.codeCompletion": false,
-  "ruby.format": "rubocop",
   "ruby.intellisense": "rubyLocate",
-  "ruby.lint": {
-    "rubocop": true
-  },
   "ruby.locate": {
     "exclude": "{**/@(tmp|.*),**/@(tmp|.*)/**,**/cdk.out/**,**/node_modules/**}"
   },
   "ruby.pathToBundler": ".vscode/bundle",
-  "ruby.rubocop.configFilePath": ".rubocop.yml",
-  "ruby.rubocop.executePath": ".vscode/",
   "ruby.useBundler": true,
   "ruby.useLanguageServer": false,
-  "solargraph.commandPath": ".vscode/solargraph",
-  "solargraph.useBundler": false,
   "sortier.onSave": true,
   "typescript.enablePromptUseWorkspaceTsdk": true,
   "typescript.tsdk": "node_modules/typescript/lib"

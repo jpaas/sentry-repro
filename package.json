@@ -50,7 +50,6 @@
     "metro-resolver": "0.74.1",
     "nx": "15.6.3",
     "prettier": "^2.6.2",
-    "react-native-config": "1.4.12",
     "react-native-svg": "13.7.0",
     "react-native-svg-transformer": "1.0.0",
     "react-test-renderer": "18.2.0",
@@ -71,7 +70,7 @@
     "lint": "nx run-many --target=lint --all --parallel --maxWarnings 0",
     "pods": "cd apps/sentry-repro/ios && pod install --repo-update",
     "sortier:all": "sortier './**/*.{css,html,js,json,jsx,ts,tsx}' '!**/__generated__' '!**/assets/i18n' '!**/build' '!**/dist' '!**/node_modules' '!**/Pods' '!**/tmp' '!**/vendor'",
-    "start": "env-cmd -f .env nx start sentry-repro",
+    "start": "env-cmd -f apps/sentry-repro/.env nx start sentry-repro",
     "ts": "nx run-many --target=ts --all --parallel"
   },
   "version": "0.0.0"

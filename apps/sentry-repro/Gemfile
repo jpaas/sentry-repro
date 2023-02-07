@@ -1,6 +1,15 @@
 source 'https://rubygems.org'
+git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
 # You may use http://rbenv.org/ or https://rvm.io/ to install and use this version
 ruby File.read(File.join(__dir__, '.ruby-version')).strip
 
-gem 'cocoapods', '~> 1.11', '>= 1.11.3'
+gem "amazing_print"
+gem "cocoapods"
+gem "dotenv"
+gem "fastlane", "~> 2"
+gem "pry"
+gem "pry-byebug"
+
+plugins_path = File.join(File.dirname(__FILE__), "fastlane", "Pluginfile")
+eval_gemfile(plugins_path) if File.exist?(plugins_path)

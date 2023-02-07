@@ -1,0 +1,312 @@
+# Fastlane docs can be found at https://docs.fastlane.tools/
+# This file is basically Ruby using a fastlane DSL, so change the syntax highlighting to Ruby
+
+# Environment Variables:
+# ======================
+#
+# Can be defined via fastlane/.env, .env, .env.rc-2-14 or .env.prod
+#
+# You will need the following defined. Refer to the README for more details:
+# SLACK_URL
+# SUPPLY_JSON_KEY
+#
+# Additionally you will need to configure gradle.properties with the properties needed by gradle to sign the Android build. Refer to the README.
+#
+# You will also need to have sentry-cli installed and configured with `sentry-cli login`
+#
+# rubocop:disable Layout/LineLength
+
+require "amazing_print"
+require "dotenv"
+require "pry"
+
+fastlane_version "2.97.0"
+
+# ===========================
+# Common hooks and lanes
+# ===========================
+before_all do
+  ensure_bundle_exec
+  update_fastlane(no_update: true)
+
+  # Set up any env vars and lane contexts
+
+  # Set the .env file to be used by the react native app build
+  ENV["ENVFILE"] = ".env.#{lane_context[SharedValues::ENVIRONMENT]}" if lane_context[SharedValues::ENVIRONMENT]
+
+  # Branch name
+  package = JSON.parse(File.read("../package.json"))
+  app_version = package["version"]
+  split_version = app_version.split(".")
+  ENV["FL_ENSURE_GIT_BRANCH_NAME"] = "rc/#{split_version[0]}.#{split_version[1]}"
+
+  # Version number
+  ENV["ANDROID_VERSIONING_VERSION_NAME"] = ENV["FL_VERSION_NUMBER_VERSION_NUMBER"] = ENV["LATEST_VERSION"] = app_version
+
+  # Sentry
+  ENV["NX_SENTRY_ENABLED"] = "true" if ENV["NX_SENTRY_ENABLED"].nil? # Enable unless already set
+  ENV["SENTRY_ORG_SLUG"] = "karma-casting"
+  ENV["SENTRY_PROJECT_SLUG"] = "sentry-repro-app"
+
+  # Print out the environment for debugging
+  puts "\n\nEnvironment variables for CLI operations:"
+  ENV.each_key { |key| puts "#{key}: #{ENV.fetch(key, nil)}" }
+
+  debug
+
+  # Make sure we have the right .env file
+  sh("test -e ../#{ENV.fetch('ENVFILE', nil)}") if lane_context[SharedValues::ENVIRONMENT]
+end
+
+# ===========================
+# Android
+# ===========================
+platform :android do
+  desc "Adds badging to icon for non-production builds"
+  lane :badge_icons do
+    # Badge icon
+    if lane_context[SharedValues::ENVIRONMENT] != "prod"
+      # NB: The shield looks like shit unless you `brew install librsvg``
+      add_badge(
+        dark: true,
+        glob: "/android/app/src/main/res/mipmap-*/ic_launcher*.png",
+        shield: "#{lane_context[SharedValues::VERSION_NAME]}-#{lane_context[SharedValues::VERSION_CODE]}-orange"
+      )
+    end
+  end
+
+  desc "Perform pre-release checks"
+  lane :pre_release_checks do
+    if ENV.fetch("NX_SENTRY_ENABLED", nil) == "true"
+      sentry_check_cli_installed
+    end
+
+    # Make sure we are on right branch and status is clean
+    # ensure_git_branch
+    # ensure_git_status_clean
+
+    # Make sure codepush is configured properly in the envfile
+    ensure_codepush_configured(app_platform: :android)
+  end
+
+  desc "Create a release build, without uploading"
+  lane :release_build do
+    # Reinstall all node modules
+    # yarn(
+    #   command: "reset",
+    #   project_root: "../.."
+    # )
+
+    # Clean android build
+    gradle(
+      print_command: true,
+      print_command_output: true,
+      project_dir: "./android",
+      task: "clean"
+    )
+
+    # Build an APK for our own ad hoc distribution and testing
+    # We do this before the AAB bundle just to be safe that all artifacts we upload to sentry are for the actual bundle that goes to the Play store
+    badge_icons
+    gradle(
+      print_command: true,
+      print_command_output: true,
+      project_dir: "./android",
+      task: "assembleRelease"
+    )
+
+    # Some metro settings
+    ENV["FORCE_BUNDLING"] = "1"
+    ENV["RCT_NO_LAUNCH_PACKAGER"] = "1"
+
+    # Create release bundle
+    sh("env")
+    gradle(
+      print_command: true,
+      print_command_output: true,
+      project_dir: "./android",
+      task: "bundleRelease"
+    )
+
+    cleanup_badged_icons
+  end
+
+  desc "Create and release a build to Google Play for internal testing"
+  lane :release_build_upload do
+    start_time = Time.now.to_i
+    pre_release_checks
+
+    # Set version number
+    increment_version_name
+    puts "Version name set to #{lane_context[SharedValues::VERSION_NAME]}"
+
+    # Increment build number
+    increment_version_code
+    ENV["NX_SENTRY_DIST"] = lane_context[SharedValues::VERSION_CODE].to_s
+    puts "Build number set to #{lane_context[SharedValues::VERSION_CODE]}"
+
+    # Create build
+    release_build
+
+    # Sentry
+    if ENV.fetch("NX_SENTRY_ENABLED", nil) == "true"
+      # I tried using the sentry.gradle file but couldn't get it to work, so we upload all artifacts manually in fastlane
+
+      BUNDLE_ID = "com.karmacasting".freeze
+      RELEASE = "#{BUNDLE_ID}@#{lane_context[SharedValues::VERSION_NAME]}:#{lane_context[SharedValues::VERSION_CODE]}".freeze
+      ENV["SENTRY_LOG_LEVEL"] = "DEBUG"
+      android_dir = Pathname.new(__FILE__).dirname.join("../android").realdirpath.to_s # Absolute path to android dir
+      ENV["SENTRY_PROPERTIES"] = "#{android_dir}/sentry.properties"
+
+      # A release is a global version number across projects. Sentry's recommendation is to use package-name@version-number as the format for mobile apps.
+      sh("sentry-cli releases new #{RELEASE}")
+
+      # Associate the current github commit hash with the build
+      sh("sentry-cli releases set-commits #{RELEASE} --auto --clear")
+
+      # Upload the proguard files to enable mapping of native source
+      sh("sentry-cli upload-proguard --android-manifest #{android_dir}/app/build/intermediates/merged_manifest/release/AndroidManifest.xml --version #{RELEASE} #{android_dir}/app/build/outputs/mapping/release/mapping.txt")
+
+      # Upload the Debug Information files. These are native symbol maps I guess.
+      # The fastane plugin command hangs, so we do it with the sentry-cli instead
+      # sentry_upload_dif(path: android_dir)
+      sh("sentry-cli upload-dif #{android_dir}")
+
+      # Build js and merge hermes sourcemaps as per https://docs.sentry.io/platforms/react-native/manual-setup/hermes/#custom-source-maps
+      repo_dir = Pathname.new("../../../").realdirpath # Absolute path to repo root dir
+      output_dir_relative = "dist/apps/sentry-repro/android"
+      output_dir = "#{repo_dir}/#{output_dir_relative}" # Absolute path to output dir
+      FileUtils.mkdir_p(output_dir) # Runs relative to fastlane dir
+      bundle_name = "index.android.bundle"
+      # TODO: There is a bug in the project.json bundleOutput option so its hard coded in here as a cli workaround. https://github.com/nrwl/nx/issues/14195
+      # Also --bundleOutput must be a relative path and sourcemapOutput must be an absolute path. Go figure.
+      yarn(
+        command: "env-cmd -f apps/sentry-repro/#{ENV.fetch('ENVFILE', '.env')} nx bundle-android sentry-repro --bundleOutput #{output_dir_relative}/#{bundle_name} --no-dev --no-minify --reset-cache --skip-nx-cache --sourcemapOutput #{output_dir}/#{bundle_name}.packager.map --sourcemapSourcesRoot #{repo_dir}",
+        project_root: "../.."
+      )
+      # Or the old CLI way
+      # yarn(
+      #   command: "react-native bundle --bundle-output #{yarn_output_dir}/#{bundle_name} --dev false --entry-file src/main.tsx --minify false --platform android --reset-cache --sourcemap-output #{output_dir}/#{bundle_name}.packager.map"
+      # )
+      # TODO: Choose bin based on platform. For now hardcoded to osx.
+      sh("../../../node_modules/react-native/sdks/hermesc/osx-bin/hermesc -emit-binary -O -output-source-map -out=#{output_dir}/#{bundle_name}.hbc #{output_dir}/#{bundle_name}")
+      sh("rm -f #{output_dir}/#{bundle_name}")
+      sh("mv #{output_dir}/#{bundle_name}.hbc #{output_dir}/#{bundle_name}")
+      sh("../../../node_modules/react-native/scripts/compose-source-maps.js #{output_dir}/#{bundle_name}.packager.map #{output_dir}/#{bundle_name}.hbc.map -o #{output_dir}/#{bundle_name}.map")
+
+      # Upload JS bundle and source map
+      sh("sentry-cli releases files #{RELEASE} upload-sourcemaps --dist #{lane_context[SharedValues::VERSION_CODE]} --strip-prefix #{repo_dir} #{output_dir}/#{bundle_name} #{output_dir}/#{bundle_name}.map")
+    end
+
+    supply(
+      skip_upload_apk: true,
+      track: "internal"
+    )
+
+    # A deploy combines a release with an environment, e.g. prod or staging and announces it to the team
+    sh("sentry-cli releases deploys #{RELEASE} new -e #{ENV.fetch('NX_DEPLOYMENT_NAME', nil)} -t #{Time.now.to_i - start_time}") if ENV.fetch("NX_SENTRY_ENABLED", nil) == "true"
+  end
+
+end
+
+# ===========================
+# iOS
+# ===========================
+platform :ios do
+  before_all do
+    ENV["FL_RS_WORKSPACE"] = ENV["GYM_WORKSPACE"] = "./ios/WorkerNativeApp.xcworkspace"
+    ENV["FL_BUILD_NUMBER_PROJECT"] = ENV["FL_VERSION_NUMBER_PROJECT"] = "./ios/WorkerNativeApp.xcodeproj"
+    ENV["FL_VERSION_NUMBER_TARGET"] = ENV["FL_RS_TARGET"] = "WorkerNativeApp"
+  end
+
+  desc "Perform pre-release checks"
+  lane :pre_release_checks do
+    if ENV.fetch("NX_SENTRY_ENABLED", nil) == "true"
+      sentry_check_cli_installed
+    end
+  end
+
+  desc "Create a release build, without uploading"
+  lane :release_build do
+    # Make sure we have the necessary signing certificates
+    match(
+      readonly: true,
+      type: "appstore"
+    )
+
+    # Reinstall all node modules
+    # yarn(
+    #   command: "reset",
+    #   project_root: "../.."
+    # )
+
+    # Clean iOS build
+    clear_derived_data
+
+    # Some metro settings
+    ENV["FORCE_BUNDLING"] = "1"
+    ENV["RCT_NO_LAUNCH_PACKAGER"] = "1"
+
+    # Create release build
+    badge_icons
+    sh("env")
+    gym(clean: true, export_method: "app-store", scheme: "WorkerNativeApp")
+    cleanup_badged_icons
+  end
+
+  desc "Create release build (without uploading) and upload artifacts to Sentry"
+  lane :release_build_sentry do
+    start_time = Time.now.to_i
+    pre_release_checks
+
+    # Create build
+    release_build
+
+    # Sentry
+    # Its too hard controlling behavior of the sentry scripts in the xcode build phases, so we upload all artifacts manually in fastlane
+
+    RELEASE = "org.reactjs.native.example.SentryRepro@1.0.0:#{ENV["NX_SENTRY_DIST"]}".freeze
+    ENV["SENTRY_LOG_LEVEL"] = "DEBUG"
+    ios_dir = Pathname.new(__FILE__).dirname.join("../ios").realdirpath.to_s # Absolute path to android dir
+    ENV["SENTRY_PROPERTIES"] = "#{ios_dir}/sentry.properties"
+
+    # A release is a global version number across projects. Sentry's recommendation is to use package-name@version-number as the format for mobile apps.
+    sh("sentry-cli releases new #{RELEASE}")
+
+    # Associate the current github commit hash with the build
+    sh("sentry-cli releases set-commits #{RELEASE} --auto --clear")
+
+    # Upload the Debug Information files. These are native symbol maps I guess.
+    sentry_upload_dif(path: lane_context[SharedValues::DSYM_OUTPUT_PATH]) # It's dumb that it doesn't use this lane context variable by default
+
+    # Generate sourcemap as per https://docs.sentry.io/platforms/react-native/manual-setup/hermes/#custom-source-maps
+    repo_dir = Pathname.new("../../../").realdirpath # Absolute path to repo root dir
+    output_dir_relative = "dist/apps/sentry-repro/ios"
+    output_dir = "#{repo_dir}/#{output_dir_relative}" # Absolute path to output dir
+    FileUtils.mkdir_p(output_dir) # Runs relative to fastlane dir
+    bundle_name = "main.jsbundle"
+    # TODO: There is a bug in the project.json bundleOutput option so its hard coded in here as a cli workaround. https://github.com/nrwl/nx/issues/14195
+    # Also --bundleOutput must be a relative path and sourcemapOutput must be an absolute path. Go figure.
+    yarn(
+      command: "env-cmd -f apps/sentry-repro/#{ENV.fetch('ENVFILE', '.env')} nx bundle-ios sentry-repro --bundleOutput #{output_dir_relative}/#{bundle_name} --no-dev --no-minify --reset-cache --skip-nx-cache --sourcemapOutput #{output_dir}/#{bundle_name}.map --sourcemapSourcesRoot #{repo_dir}",
+      project_root: "../.."
+    )
+    # Or the old CLI way
+    # yarn(
+    #   command: "react-native bundle --bundle-output #{output_dir}/#{bundle_name} --dev false --entry-file src/main.tsx --minify false --platform ios --reset-cache --sourcemap-output #{output_dir}/#{bundle_name}.map"
+    # )
+
+    # Upload JS bundle and source map
+    sh("sentry-cli releases files #{RELEASE} upload-sourcemaps --dist #{lane_context[SharedValues::BUILD_NUMBER]} --strip-prefix #{repo_dir} #{output_dir}/#{bundle_name} #{output_dir}/#{bundle_name}.map")
+
+    # A deploy combines a release with an environment, e.g. prod or staging and announces it to the team
+    sh("sentry-cli releases deploys #{RELEASE} new -e development, nil)} -t #{Time.now.to_i - start_time}")
+  end
+
+  desc "Upload any iOS dsyms laying about to Sentry"
+  lane :upload_dsyms_to_sentry do
+    download_dsyms
+    sentry_upload_dsym
+  end
+end
+# rubocop:enable Layout/LineLength
