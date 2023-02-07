@@ -1,14 +1,16 @@
 {
-  "name": "sentry-repro",
-  "version": "0.0.1",
-  "private": true,
   "dependencies": {
+    "@react-native-async-storage/async-storage": "*",
+    "@sentry/react-native": "*",
     "@testing-library/jest-native": "*",
     "@testing-library/react-native": "*",
+    "metro-config": "*",
     "react": "*",
     "react-native": "*",
     "react-native-config": "*",
-    "react-native-svg": "*",
-    "@react-native-async-storage/async-storage": "*"
-  }
+    "react-native-svg": "*"
+  },
+  "name": "sentry-repro",
+  "private": true,
+  "version": "0.0.1"
 }

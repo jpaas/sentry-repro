@@ -1,15 +1,14 @@
+# Directories to ignore
 **/__generated__
 **/assets/i18n
 **/bin
 **/build
 **/coverage
 **/dist
-**/karma-backend/schema.graphql
 **/log
 **/node_modules
 **/Pods
 **/public/assets
 **/tmp
 **/vendor
-**/*.storyboard
 **/*.xc*

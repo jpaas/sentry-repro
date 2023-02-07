@@ -1,56 +1,33 @@
 {
-  "name": "sentry-repro",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/sentry-repro/src",
+  "name": "sentry-repro",
   "projectType": "application",
+  "sourceRoot": "apps/sentry-repro/src",
+  "tags": [],
   "targets": {
-    "start": {
-      "executor": "@nrwl/react-native:start",
-      "options": {
-        "port": 8081
-      }
-    },
-    "serve": {
-      "executor": "nx:run-commands",
-      "options": {
-        "command": "nx start sentry-repro"
-      }
-    },
-    "run-ios": {
-      "executor": "@nrwl/react-native:run-ios",
-      "options": {}
-    },
-    "bundle-ios": {
-      "executor": "@nrwl/react-native:bundle",
-      "options": {
-        "entryFile": "src/main.tsx",
-        "platform": "ios",
-        "bundleOutput": "dist/apps/sentry-repro/ios/main.jsbundle"
-      }
-    },
-    "run-android": {
-      "executor": "@nrwl/react-native:run-android",
-      "options": {}
-    },
     "build-android": {
       "executor": "@nrwl/react-native:build-android",
+      "options": {},
       "outputs": [
         "{projectRoot}/android/app/build/outputs/bundle",
         "{projectRoot}/android/app/build/outputs/apk"
-      ],
-      "options": {}
+      ]
     },
     "bundle-android": {
       "executor": "@nrwl/react-native:bundle",
       "options": {
+        "bundleOutput": "dist/apps/sentry-repro/android/main.jsbundle",
         "entryFile": "src/main.tsx",
-        "platform": "android",
-        "bundleOutput": "dist/apps/sentry-repro/android/main.jsbundle"
+        "platform": "android"
       }
     },
-    "sync-deps": {
-      "executor": "@nrwl/react-native:sync-deps",
-      "options": {}
+    "bundle-ios": {
+      "executor": "@nrwl/react-native:bundle",
+      "options": {
+        "bundleOutput": "dist/apps/sentry-repro/ios/main.jsbundle",
+        "entryFile": "src/main.tsx",
+        "platform": "ios"
+      }
     },
     "ensure-symlink": {
       "executor": "@nrwl/react-native:ensure-symlink",
@@ -58,25 +35,58 @@
     },
     "lint": {
       "executor": "@nrwl/linter:eslint",
-      "outputs": ["{options.outputFile}"],
       "options": {
         "lintFilePatterns": ["apps/sentry-repro/**/*.{ts,tsx,js,jsx}"]
+      },
+      "outputs": ["{options.outputFile}"]
+    },
+    "run-android": {
+      "executor": "@nrwl/react-native:run-android",
+      "options": {}
+    },
+    "run-ios": {
+      "executor": "@nrwl/react-native:run-ios",
+      "options": {}
+    },
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nx start sentry-repro"
       }
     },
-    "test": {
-      "executor": "@nrwl/jest:jest",
-      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
+    "start": {
+      "executor": "@nrwl/react-native:start",
       "options": {
-        "jestConfig": "apps/sentry-repro/jest.config.ts",
-        "passWithNoTests": true
-      },
+        "port": 8081
+      }
+    },
+    "sync-deps": {
+      "executor": "@nrwl/react-native:sync-deps",
+      "options": {}
+    },
+    "test": {
       "configurations": {
         "ci": {
           "ci": true,
           "codeCoverage": true
         }
+      },
+      "executor": "@nrwl/jest:jest",
+      "options": {
+        "jestConfig": "apps/sentry-repro/jest.config.ts",
+        "passWithNoTests": true
+      },
+      "outputs": ["{workspaceRoot}/coverage/{projectRoot}"]
+    },
+    "ts": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          {
+            "command": "tsc -p apps/sentry-repro/tsconfig.app.json"
+          }
+        ]
       }
     }
-  },
-  "tags": []
+  }
 }

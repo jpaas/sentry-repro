@@ -4,23 +4,23 @@ const exclusionList = require('metro-config/src/defaults/exclusionList');
 
 module.exports = (async () => {
   const {
-    resolver: { sourceExts, assetExts },
+    resolver: { assetExts, sourceExts },
   } = await getDefaultConfig();
   return withNxMetro(
     {
+      resolver: {
+        assetExts: assetExts.filter((ext) => ext !== 'svg'),
+        blockList: exclusionList([/^(?!.*node_modules).*\/dist\/.*/]),
+        sourceExts: [...sourceExts, 'svg'],
+      },
       transformer: {
+        babelTransformerPath: require.resolve('react-native-svg-transformer'),
         getTransformOptions: async () => ({
           transform: {
             experimentalImportSupport: false,
             inlineRequires: true,
           },
         }),
-        babelTransformerPath: require.resolve('react-native-svg-transformer'),
-      },
-      resolver: {
-        assetExts: assetExts.filter((ext) => ext !== 'svg'),
-        sourceExts: [...sourceExts, 'svg'],
-        blockList: exclusionList([/^(?!.*node_modules).*\/dist\/.*/]),
       },
     },
     {

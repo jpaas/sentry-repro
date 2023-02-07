@@ -1,0 +1,8 @@
+# See https://git-scm.com/docs/gitattributes for more about git attribute files.
+
+*.pbxproj -text
+*.js text eol=lf
+*.jsx text eol=lf
+*.java text eol=lf
+*.json text eol=lf
+*.rb text eol=lf
