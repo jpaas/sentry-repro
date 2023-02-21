@@ -109,3 +109,6 @@ yarn-error.log
 
 
 apps/sentry-repro-e2e/artifacts
+
+# Custom
+sentry.properties

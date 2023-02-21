@@ -11,15 +11,14 @@ import {
   View,
 } from "react-native"
 import Svg, { Path } from "react-native-svg"
+import { crashyFn } from "./SomeService"
 
 export const App = () => {
   const [whatsNextYCoord, setWhatsNextYCoord] = useState<number>(0)
   const scrollViewRef = useRef<null | ScrollView>(null)
 
   const handleSentryPress = useCallback(() => {
-    const message = "Triggering javascript crash..."
-    console.info(message)
-    throw new Error(message)
+    crashyFn()
   }, [])
 
   return (

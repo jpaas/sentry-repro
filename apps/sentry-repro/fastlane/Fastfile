@@ -260,7 +260,7 @@ platform :ios do
     pre_release_checks
 
     # Create build
-    release_build
+    # release_build
 
     # Sentry
     # Its too hard controlling behavior of the sentry scripts in the xcode build phases, so we upload all artifacts manually in fastlane
@@ -277,7 +277,7 @@ platform :ios do
     sh("sentry-cli releases set-commits #{RELEASE} --auto --clear")
 
     # Upload the Debug Information files. These are native symbol maps I guess.
-    sentry_upload_dif(path: lane_context[SharedValues::DSYM_OUTPUT_PATH]) # It's dumb that it doesn't use this lane context variable by default
+    # sentry_upload_dif(path: lane_context[SharedValues::DSYM_OUTPUT_PATH]) # It's dumb that it doesn't use this lane context variable by default
 
     # Generate sourcemap as per https://docs.sentry.io/platforms/react-native/manual-setup/hermes/#custom-source-maps
     repo_dir = Pathname.new("../../../").realdirpath # Absolute path to repo root dir
@@ -297,10 +297,10 @@ platform :ios do
     # )
 
     # Upload JS bundle and source map
-    sh("sentry-cli releases files #{RELEASE} upload-sourcemaps --dist #{lane_context[SharedValues::BUILD_NUMBER]} --strip-prefix #{repo_dir} #{output_dir}/#{bundle_name} #{output_dir}/#{bundle_name}.map")
+    sh("sentry-cli releases files #{RELEASE} upload-sourcemaps --dist #{ENV["NX_SENTRY_DIST"]} --strip-prefix #{repo_dir} #{output_dir}/#{bundle_name} #{output_dir}/#{bundle_name}.map")
 
     # A deploy combines a release with an environment, e.g. prod or staging and announces it to the team
-    sh("sentry-cli releases deploys #{RELEASE} new -e development, nil)} -t #{Time.now.to_i - start_time}")
+    sh("sentry-cli releases deploys #{RELEASE} new -e development} -t #{Time.now.to_i - start_time}")
   end
 
   desc "Upload any iOS dsyms laying about to Sentry"

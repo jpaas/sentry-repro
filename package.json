@@ -67,6 +67,7 @@
   "scripts": {
     "android": "nx run-android sentry-repro",
     "ios": "nx run-ios sentry-repro --install=false",
+    "ios:release": "env-cmd -f apps/sentry-repro/.env nx run-ios sentry-repro --xcodeConfiguration=Release --install=false",
     "lint": "nx run-many --target=lint --all --parallel --maxWarnings 0",
     "pods": "cd apps/sentry-repro/ios && pod install --repo-update",
     "sortier:all": "sortier './**/*.{css,html,js,json,jsx,ts,tsx}' '!**/__generated__' '!**/assets/i18n' '!**/build' '!**/dist' '!**/node_modules' '!**/Pods' '!**/tmp' '!**/vendor'",
