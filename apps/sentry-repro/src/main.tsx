@@ -10,7 +10,7 @@ Sentry.init({
   dist,
   dsn,
   environment: "development",
-  release: "1.0.0",
+  release: `org.reactjs.native.example.SentryRepro@1.0.0:${dist}`,
   tracesSampleRate: 1.0
 })
 

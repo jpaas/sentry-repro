@@ -300,7 +300,7 @@ platform :ios do
     sh("sentry-cli releases files #{RELEASE} upload-sourcemaps --dist #{ENV["NX_SENTRY_DIST"]} --strip-prefix #{repo_dir} #{output_dir}/#{bundle_name} #{output_dir}/#{bundle_name}.map")
 
     # A deploy combines a release with an environment, e.g. prod or staging and announces it to the team
-    sh("sentry-cli releases deploys #{RELEASE} new -e development} -t #{Time.now.to_i - start_time}")
+    sh("sentry-cli releases deploys #{RELEASE} new -e development -t #{Time.now.to_i - start_time}")
   end
 
   desc "Upload any iOS dsyms laying about to Sentry"

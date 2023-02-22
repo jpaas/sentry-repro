@@ -41,7 +41,7 @@ export const App = () => {
           <View style={styles.section}>
             <TouchableOpacity onPress={handleSentryPress} style={styles.sentryCrashButton}>
               <Text style={[styles.textMd, styles.textCenter, styles.heroTitleText]}>
-                Sentry JS Crash
+                {`Sentry JS Crash - dist ${process.env.NX_SENTRY_DIST || "1"}`}
               </Text>
             </TouchableOpacity>
           </View>
